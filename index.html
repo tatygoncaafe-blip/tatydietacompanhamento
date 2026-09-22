@@ -208,30 +208,36 @@
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
                 <h2 class="text-base font-bold text-slate-200 mb-4 flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-5 h-5 text-emerald-400"></i>
-                    Adicionar Alimento (Cálculo Automático)
+                    Adicionar Alimento
                 </h2>
 
                 <form id="food-form" class="space-y-4">
                     <div>
-                        <input type="text" id="food-input" placeholder="Ex: 150g de peito de frango grelhado + 2 ovos mexidos" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition placeholder:text-slate-600" required>
+                        <input type="text" id="food-input" placeholder="Ex: Cuscuz com queijo minas e 1 ovo" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition placeholder:text-slate-600" required>
+                    </div>
+
+                    <!-- Manual override / calculated input fields -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">Calorias (kcal)</label>
+                            <input type="number" id="input-cal" placeholder="Auto" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-orange-400 font-bold focus:outline-none focus:border-orange-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">Proteína (g)</label>
+                            <input type="number" id="input-prot" placeholder="Auto" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-amber-400 font-bold focus:outline-none focus:border-amber-500">
+                        </div>
+                        <div class="col-span-2 sm:col-span-1">
+                            <label class="block text-[11px] text-slate-400 mb-1">Qualidade (0-100)</label>
+                            <input type="number" id="input-qual" value="85" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-500">
+                        </div>
                     </div>
 
                     <!-- Quick Preset Shortcuts -->
                     <div class="flex flex-wrap gap-2 text-xs">
+                        <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="Cuscuz com queijo minas">🌽 Cuscuz + Queijo</button>
                         <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="150g Peito de Frango Grelhado">🍗 Frango 150g</button>
-                        <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="3 Ovos Cozidos + 1 Pão Integral">🍳 3 Ovos + Pão</button>
-                        <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="30g Whey Protein + 1 Banana">🥤 Shake Whey + Banana</button>
-                        <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="150g Patinho Moído + 100g Batata Doce">🥩 Carne + Batata Doce</button>
-                    </div>
-
-                    <!-- Auto Calculation Preview -->
-                    <div id="calculation-preview" class="hidden bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs flex items-center justify-between">
-                        <div class="text-slate-400">Estimativa detectada:</div>
-                        <div class="flex items-center gap-4">
-                            <span class="text-orange-400 font-bold"><span id="prev-cal">0</span> kcal</span>
-                            <span class="text-amber-400 font-bold"><span id="prev-prot">0</span>g Proteína</span>
-                            <span class="text-emerald-400 font-bold">Qualidade: <span id="prev-qual">80</span>/100</span>
-                        </div>
+                        <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="Café sem açúcar">☕ Café sem Açúcar</button>
+                        <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="Maçã">🍎 Maçã</button>
                     </div>
 
                     <button type="submit" class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2">
@@ -385,8 +391,6 @@
                     <input type="text" id="cfg-appid" placeholder="1:12345678:web:..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 font-mono" required>
                 </div>
 
-                <div id="modal-feedback" class="hidden p-2 rounded-lg text-[11px]"></div>
-
                 <div class="flex gap-2 pt-2">
                     <button type="submit" class="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl transition">
                         Salvar e Conectar
@@ -454,44 +458,70 @@
             setDate(new Date().toISOString().split('T')[0]);
         });
 
-        // PARSER DE ALIMENTOS AUTOMÁTICO
+        // NOVO PARSER EXPANDIDO DE ALIMENTOS
         function parseFoodInput(text) {
             const lower = text.toLowerCase();
             let cal = 0;
             let prot = 0;
-            let qual = 80;
+            let qual = 85;
 
-            // Deteção simples por palavras-chave
-            if (lower.includes('frango')) { cal += 240; prot += 32; qual += 10; }
-            if (lower.includes('ovo')) { cal += 160; prot += 13; qual += 5; }
-            if (lower.includes('pão')) { cal += 140; prot += 4; }
-            if (lower.includes('whey') || lower.includes('shake')) { cal += 130; prot += 24; }
+            // Bebidas
+            if (lower.includes('café') || lower.includes('cafe')) {
+                if (lower.includes('açúcar') || lower.includes('acucar')) { cal += 40; prot += 0; }
+                else { cal += 5; prot += 0; qual += 5; }
+            }
+
+            // Frutas & Lanches
+            if (lower.includes('maçã') || lower.includes('maca')) { cal += 70; prot += 0; qual += 10; }
             if (lower.includes('banana')) { cal += 90; prot += 1; qual += 5; }
-            if (lower.includes('carne') || lower.includes('patinho')) { cal += 260; prot += 30; }
-            if (lower.includes('batata doce') || lower.includes('arroz')) { cal += 150; prot += 3; }
-            if (lower.includes('salada') || lower.includes('legumes')) { cal += 40; prot += 2; qual += 15; }
+            if (lower.includes('mamão') || lower.includes('mamao')) { cal += 50; prot += 1; qual += 10; }
 
-            // Caso nada tenha sido identificado
-            if (cal === 0) { cal = 200; prot = 15; }
+            // Cuscuz & Carboidratos
+            if (lower.includes('cuscuz')) { cal += 150; prot += 3; qual += 5; }
+            if (lower.includes('tapioca')) { cal += 140; prot += 1; }
+            if (lower.includes('pão') || lower.includes('pao')) { cal += 130; prot += 4; }
+            if (lower.includes('arroz')) { cal += 130; prot += 3; }
+            if (lower.includes('batata')) { cal += 110; prot += 2; qual += 5; }
+            if (lower.includes('aveia')) { cal += 100; prot += 4; qual += 10; }
+
+            // Laticínios / Queijos
+            if (lower.includes('queijo minas') || lower.includes('queijo branco')) { cal += 80; prot += 6; qual += 5; }
+            else if (lower.includes('queijo')) { cal += 110; prot += 7; }
+            if (lower.includes('iogurte')) { cal += 90; prot += 7; qual += 5; }
+
+            // Proteínas Principais
+            if (lower.includes('frango')) { cal += 220; prot += 31; qual += 10; }
+            if (lower.includes('ovo')) { cal += 150; prot += 13; qual += 5; }
+            if (lower.includes('whey') || lower.includes('shake')) { cal += 120; prot += 24; qual += 5; }
+            if (lower.includes('carne') || lower.includes('patinho')) { cal += 240; prot += 28; qual += 5; }
+            if (lower.includes('peixe') || lower.includes('tilápia') || lower.includes('tilapia')) { cal += 180; prot += 26; qual += 10; }
+
+            // Verduras / Acompanhamentos
+            if (lower.includes('salada') || lower.includes('legumes')) { cal += 30; prot += 1; qual += 15; }
+
+            // Se nenhum alimento conhecido foi detectado
+            if (cal === 0 && prot === 0) {
+                cal = 120;
+                prot = 5;
+            }
 
             qual = Math.min(100, qual);
             return { cal, prot, qual };
         }
 
-        // AUTO PREVIEW INPUT
+        // AUTO PREVIEW & INPUT EVENTS
         const foodInput = document.getElementById('food-input');
-        const calcPreview = document.getElementById('calculation-preview');
+        const inputCal = document.getElementById('input-cal');
+        const inputProt = document.getElementById('input-prot');
+        const inputQual = document.getElementById('input-qual');
         
         foodInput.addEventListener('input', () => {
             const val = foodInput.value.trim();
-            if (val.length > 3) {
+            if (val.length > 2) {
                 const parsed = parseFoodInput(val);
-                document.getElementById('prev-cal').textContent = parsed.cal;
-                document.getElementById('prev-prot').textContent = parsed.prot;
-                document.getElementById('prev-qual').textContent = parsed.qual;
-                calcPreview.classList.remove('hidden');
-            } else {
-                calcPreview.classList.add('hidden');
+                inputCal.value = parsed.cal;
+                inputProt.value = parsed.prot;
+                inputQual.value = parsed.qual;
             }
         });
 
@@ -519,19 +549,23 @@
             const text = foodInput.value.trim();
             if (!text) return;
 
-            const parsed = parseFoodInput(text);
+            const calVal = parseInt(inputCal.value) || 0;
+            const protVal = parseInt(inputProt.value) || 0;
+            const qualVal = parseInt(inputQual.value) || 85;
+
             const newItem = {
                 id: Date.now(),
                 name: text,
-                calories: parsed.cal,
-                protein: parsed.prot,
-                quality: parsed.qual,
+                calories: calVal,
+                protein: protVal,
+                quality: qualVal,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
 
             dailyData.foods.push(newItem);
             foodInput.value = '';
-            calcPreview.classList.add('hidden');
+            inputCal.value = '';
+            inputProt.value = '';
 
             saveDailyData();
             updateUI();
@@ -801,7 +835,7 @@
 
             modal.classList.add('hidden');
             initFirebase();
-            alert('Configuração salva! Testando conexão com a nuvem...');
+            alert('Configuração salva!');
         });
 
         document.getElementById('reset-config-btn').addEventListener('click', () => {
