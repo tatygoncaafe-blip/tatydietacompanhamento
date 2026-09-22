@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FitRecomp Cloud - Recomposição Corporal & Nutrição</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Custom scrollbar for sleek mobile experience */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Smooth tab animations */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.2s ease-in-out; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Input styling overrides */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.8);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-20 md:pb-6 antialiased">
+
+    <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-bolt text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base md:text-lg text-white flex items-center gap-2">
+                        FitRecomp <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">Nuvem Sync</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 hidden sm:block">Perda abdominal & Preservação muscular (62kg)</p>
+                </div>
+            </div>
+
+            <!-- Cloud Sync Indicator & Config Button -->
+            <div class="flex items-center gap-2">
+                <div id="sync-badge" class="px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 flex items-center gap-2 text-xs text-slate-300">
+                    <span id="sync-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span id="sync-status-text" class="font-medium text-[11px] sm:text-xs">Conectando...</span>
+                </div>
+
+                <button onclick="openCloudModal()" class="p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl transition active:scale-95" title="Configurações do Firebase">
+                    <i class="fa-solid fa-cloud text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="bg-slate-800/60 border-b border-slate-800 py-2.5 px-4 sticky top-[61px] z-30 backdrop-blur-sm">
+        <div class="max-w-6xl mx-auto flex items-center justify-between gap-2">
+            <button onclick="changeDate(-1)" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition active:scale-95">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+
+            <div class="flex items-center gap-2">
+                <i class="fa-regular fa-calendar text-emerald-400 text-sm"></i>
+                <input type="date" id="active-date-picker" onchange="onDatePickerChange(this.value)" class="bg-slate-900 text-white font-semibold text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer">
+                <button onclick="selectToday()" class="text-[11px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-semibold hover:bg-emerald-500/30 transition">
+                    Hoje
+                </button>
+            </div>
+
+            <button onclick="changeDate(1)" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition active:scale-95">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <main class="max-w-6xl mx-auto px-4 pt-4 flex-1 w-full space-y-5">
+
+        <!-- Focus Alert Container -->
+        <div id="dynamic-alert-banner">
+            <!-- Dynamic alerts generated by JS -->
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            
+            <!-- Card 1: Calorias -->
+            <div class="bg-slate-800/90 rounded-2xl p-4 border border-slate-700/80 shadow-lg relative overflow-hidden flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-medium text-slate-400">Calorias (kcal)</span>
+                        <span class="p-1.5 bg-orange-500/10 text-orange-400 rounded-lg text-xs"><i class="fa-solid fa-fire"></i></span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mb-2">
+                        <span id="card-calories-val" class="text-2xl font-extrabold text-white">0</span>
+                        <span class="text-slate-400 text-xs">/ 1600</span>
+                    </div>
+                    <div class="w-full bg-slate-700/70 h-2.5 rounded-full overflow-hidden">
+                        <div id="bar-calories" class="bg-gradient-to-r from-orange-500 to-amber-400 h-full w-0 transition-all duration-500 rounded-full"></div>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-700/50 flex justify-between items-center text-[11px]">
+                    <span class="text-slate-400">Restante:</span>
+                    <strong id="card-calories-rest" class="text-orange-400">1600 kcal</strong>
+                </div>
+            </div>
+
+            <!-- Card 2: Proteínas -->
+            <div class="bg-slate-800/90 rounded-2xl p-4 border border-slate-700/80 shadow-lg relative overflow-hidden flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-medium text-slate-400">Proteína (2g/kg)</span>
+                        <span class="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg text-xs"><i class="fa-solid fa-drumstick-bite"></i></span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mb-2">
+                        <span id="card-protein-val" class="text-2xl font-extrabold text-white">0</span>
+                        <span class="text-slate-400 text-xs">/ 124g</span>
+                    </div>
+                    <div class="w-full bg-slate-700/70 h-2.5 rounded-full overflow-hidden">
+                        <div id="bar-protein" class="bg-gradient-to-r from-amber-500 to-amber-400 h-full w-0 transition-all duration-500 rounded-full"></div>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-700/50 flex justify-between items-center text-[11px]">
+                    <span class="text-slate-400">Falta:</span>
+                    <strong id="card-protein-rest" class="text-amber-400">124g</strong>
+                </div>
+            </div>
+
+            <!-- Card 3: Água -->
+            <div class="bg-slate-800/90 rounded-2xl p-4 border border-slate-700/80 shadow-lg relative overflow-hidden flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-medium text-slate-400">Hidratação</span>
+                        <span class="p-1.5 bg-sky-500/10 text-sky-400 rounded-lg text-xs"><i class="fa-solid fa-droplet"></i></span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mb-2">
+                        <span id="card-water-val" class="text-2xl font-extrabold text-white">0</span>
+                        <span class="text-slate-400 text-xs">/ 2800 ml</span>
+                    </div>
+                    <div class="w-full bg-slate-700/70 h-2.5 rounded-full overflow-hidden">
+                        <div id="bar-water" class="bg-gradient-to-r from-sky-500 to-cyan-400 h-full w-0 transition-all duration-500 rounded-full"></div>
+                    </div>
+                </div>
+                <div class="mt-2 pt-2 border-t border-slate-700/50 flex items-center gap-1.5">
+                    <button onclick="addWater(250)" class="flex-1 py-1 bg-slate-700 hover:bg-slate-600 text-sky-300 font-semibold text-[11px] rounded-lg transition active:scale-95">
+                        +250ml
+                    </button>
+                    <button onclick="addWater(500)" class="flex-1 py-1 bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 border border-sky-500/30 font-semibold text-[11px] rounded-lg transition active:scale-95">
+                        +500ml
+                    </button>
+                </div>
+            </div>
+
+            <!-- Card 4: Qualidade da Dieta -->
+            <div class="bg-slate-800/90 rounded-2xl p-4 border border-slate-700/80 shadow-lg relative overflow-hidden flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-medium text-slate-400">Qualidade Limpa</span>
+                        <span class="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs"><i class="fa-solid fa-leaf"></i></span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mb-2">
+                        <span id="card-quality-val" class="text-2xl font-extrabold text-white">--</span>
+                        <span class="text-slate-400 text-xs">/ 100</span>
+                    </div>
+                    <div class="w-full bg-slate-700/70 h-2.5 rounded-full overflow-hidden">
+                        <div id="bar-quality" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full w-0 transition-all duration-500 rounded-full"></div>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-700/50 flex justify-between items-center text-[11px]">
+                    <span class="text-slate-400">Meta:</span>
+                    <strong class="text-emerald-400">≥ 80 pts</strong>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="flex bg-slate-800/80 p-1 rounded-2xl border border-slate-700/80 shadow-inner">
+            <button onclick="switchTab('dieta')" id="tab-btn-dieta" class="flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow">
+                <i class="fa-solid fa-utensils"></i> Dieta do Dia
+            </button>
+            <button onclick="switchTab('medidas')" id="tab-btn-medidas" class="flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-slate-400 hover:text-white transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-tape"></i> Medidas & Evolução
+            </button>
+            <button onclick="switchTab('dicas')" id="tab-btn-dicas" class="flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-slate-400 hover:text-white transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-lightbulb"></i> Dicas Recomp
+            </button>
+        </div>
+
+        <div id="tab-dieta" class="tab-content active space-y-5">
+            
+            <!-- Food Input Form -->
+            <div class="bg-slate-800/90 rounded-2xl p-5 border border-slate-700 shadow-xl">
+                <h2 class="font-bold text-white text-sm sm:text-base mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-plus-circle text-emerald-400"></i> Adicionar Alimento (Cálculo Automático)
+                </h2>
+
+                <form id="food-form" onsubmit="handleFoodSubmit(event)" class="space-y-3">
+                    <div>
+                        <input type="text" id="food-input" required oninput="previewFoodStats()" placeholder="Ex: 150g de peito de frango grelhado + 2 ovos mexidos" 
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner">
+                    </div>
+
+                    <!-- Shortcut Chips -->
+                    <div class="flex flex-wrap gap-1.5">
+                        <button type="button" onclick="setQuickInput('3 ovos mexidos com 1 fatia de pão integral')" class="text-[11px] bg-slate-900 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 transition">
+                            🍳 3 Ovos + Pão
+                        </button>
+                        <button type="button" onclick="setQuickInput('150g de frango + 100g de arroz integral + salada')" class="text-[11px] bg-slate-900 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 transition">
+                            🍗 Frango + Arroz
+                        </button>
+                        <button type="button" onclick="setQuickInput('30g de whey protein + 1 banana + 20g aveia')" class="text-[11px] bg-slate-900 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 transition">
+                            🥤 Shake Whey + Banana
+                        </button>
+                        <button type="button" onclick="setQuickInput('150g de patinho moído + 100g de batata doce')" class="text-[11px] bg-slate-900 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 transition">
+                            🥩 Carne + Batata Doce
+                        </button>
+                    </div>
+
+                    <!-- Live Estimation Box -->
+                    <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-700/80 flex items-center justify-between gap-2 text-xs">
+                        <span class="text-slate-400 font-medium">Estimativa:</span>
+                        <div class="flex items-center gap-3 font-semibold">
+                            <span class="text-orange-400"><span id="prev-cal">0</span> kcal</span>
+                            <span class="text-amber-400"><span id="prev-prot">0</span>g Proteína</span>
+                            <span class="text-emerald-400">Qualidade <span id="prev-qual">80</span>/100</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-bold rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
+                        <i class="fa-solid fa-check"></i> Salvar na Nuvem
+                    </button>
+                </form>
+            </div>
+
+            <!-- Meal List for Selected Date -->
+            <div class="bg-slate-800/90 rounded-2xl p-5 border border-slate-700 shadow-xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-slate-400"></i> Alimentos do Dia (<span id="active-date-label">Hoje</span>)
+                    </h3>
+                    <span id="meal-count-badge" class="text-xs bg-slate-700/60 px-2.5 py-1 rounded-full text-slate-300 font-medium">0 itens</span>
+                </div>
+
+                <div id="meals-container" class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                    <!-- Dynamic Meals -->
+                </div>
+            </div>
+
+        </div>
+
+        <div id="tab-medidas" class="tab-content space-y-5">
+            
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
+                
+                <!-- Measurements Logger Form -->
+                <div class="md:col-span-5 bg-slate-800/90 rounded-2xl p-5 border border-slate-700 shadow-xl">
+                    <h3 class="font-bold text-white text-sm mb-1 flex items-center gap-2">
+                        <i class="fa-solid fa-ruler-combined text-sky-400"></i> Medidas Semanal (1x por semana)
+                    </h3>
+                    <p class="text-xs text-slate-400 mb-4">O foco é a queda da **cintura/barriga** mantendo o **peso**.</p>
+
+                    <form id="meas-form" onsubmit="handleMeasurementSubmit(event)" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Peso Atual (kg)</label>
+                            <input type="number" step="0.1" id="m-weight" required placeholder="62.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Cintura/Barriga (cm) *</label>
+                            <input type="number" step="0.1" id="m-waist" required placeholder="Ex: 79.5" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Quadril (cm)</label>
+                                <input type="number" step="0.1" id="m-hip" placeholder="Ex: 95.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Coxa (cm)</label>
+                                <input type="number" step="0.1" id="m-thigh" placeholder="Ex: 54.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20 active:scale-[0.99]">
+                            <i class="fa-solid fa-floppy-disk"></i> Salvar Medidas
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Chart & History Table -->
+                <div class="md:col-span-7 space-y-5">
+                    
+                    <div class="bg-slate-800/90 rounded-2xl p-5 border border-slate-700 shadow-xl">
+                        <h4 class="font-bold text-white text-sm mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-emerald-400"></i> Evolução: Cintura vs Peso
+                        </h4>
+                        <div class="h-60 w-full relative">
+                            <canvas id="evolutionChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- History Table -->
+                    <div class="bg-slate-800/90 rounded-2xl p-4 border border-slate-700 shadow-xl">
+                        <h4 class="font-bold text-white text-xs uppercase text-slate-400 tracking-wider mb-2">Histórico de Medidas Registradas</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-300">
+                                <thead class="bg-slate-900/60 text-slate-400 border-b border-slate-700">
+                                    <tr>
+                                        <th class="p-2">Data</th>
+                                        <th class="p-2">Peso</th>
+                                        <th class="p-2 text-sky-400">Cintura</th>
+                                        <th class="p-2">Quadril</th>
+                                        <th class="p-2">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="meas-table-body" class="divide-y divide-slate-700/50">
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div id="tab-dicas" class="tab-content space-y-4">
+            <div class="bg-slate-800/90 rounded-2xl p-5 border border-slate-700 shadow-xl space-y-4">
+                <h3 class="font-bold text-white text-base flex items-center gap-2">
+                    <i class="fa-solid fa-bullseye text-amber-400"></i> Estratégia Recomendada para o seu Perfil (62 kg)
+                </h3>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div class="p-3.5 bg-slate-900/70 rounded-xl border border-slate-700/70 space-y-1">
+                        <strong class="text-amber-400 block text-sm">1. Mantenha Proteína em 124g/dia</strong>
+                        <p class="text-slate-300 leading-relaxed">Para não perder massa magra enquanto elimina a gordura da barriga, distribua a proteína em pelo menos 3 ou 4 refeições (ex: 30g por refeição).</p>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-900/70 rounded-xl border border-slate-700/70 space-y-1">
+                        <strong class="text-sky-400 block text-sm">2. Hidratação Constante (2.8 Litros)</strong>
+                        <p class="text-slate-300 leading-relaxed">O consumo adequado de água ajuda a reduzir a retenção hídrica abdominal e desinflama o corpo. Tome 500ml ao acordar.</p>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-900/70 rounded-xl border border-slate-700/70 space-y-1">
+                        <strong class="text-emerald-400 block text-sm">3. Déficit Calórico Moderado (1600 kcal)</strong>
+                        <p class="text-slate-300 leading-relaxed">Evite cortar calorias demais! Se comer menos de 1200 kcal, seu corpo queimará massa magra em vez de gordura da barriga.</p>
+                    </div>
+
+                    <div class="p-3.5 bg-slate-900/70 rounded-xl border border-slate-700/70 space-y-1">
+                        <strong class="text-orange-400 block text-sm">4. Musculação + Cardio Moderado</strong>
+                        <p class="text-slate-300 leading-relaxed">Treinos pesados de força sinalizam ao corpo para segurar os músculos. Use caminhadas leves a moderadas para queimar calorias extras.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="cloud-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-white text-base flex items-center gap-2">
+                    <i class="fa-solid fa-cloud text-emerald-400"></i> Configurar Conexão de Nuvem (Firebase)
+                </h3>
+                <button onclick="closeCloudModal()" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-300 leading-relaxed">
+                Este sistema utiliza o <strong>Firebase Firestore gratuito</strong> para sincronizar seus dados em tempo real entre o celular e o computador.
+            </p>
+
+            <div class="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 leading-relaxed">
+                <i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i>
+                <strong>Sincronização Padrão Ativa:</strong> Você já está utilizando uma instância padrão. Para usar seu próprio banco privado, cole suas credenciais do Firebase abaixo.
+            </div>
+
+            <form onsubmit="saveFirebaseCredentials(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1 font-mono">apiKey</label>
+                    <input type="text" id="cfg-apiKey" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:border-emerald-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1 font-mono">authDomain</label>
+                    <input type="text" id="cfg-authDomain" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:border-emerald-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1 font-mono">projectId</label>
+                    <input type="text" id="cfg-projectId" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:border-emerald-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1 font-mono">appId</label>
+                    <input type="text" id="cfg-appId" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:border-emerald-500 focus:outline-none">
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 font-bold text-white rounded-xl transition">
+                        Salvar e Conectar
+                    </button>
+                    <button type="button" onclick="resetToDefaultFirebase()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition">
+                        Restaurar Padrão
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Constants
+        const TARGET_CALORIES = 1600;
+        const TARGET_PROTEIN = 124;
+        const TARGET_WATER = 2800;
+
+        // Firebase Default Config
+        const defaultConfig = {
+            apiKey: "AIzaSyDemoFitRecompCloudKey2026",
+            authDomain: "fit-recomp-demo.firebaseapp.com",
+            projectId: "fit-recomp-demo",
+            storageBucket: "fit-recomp-demo.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+
+        // Internal Food Database
+        const FOOD_DB = [
+            { keywords: ['ovo', 'ovos', 'omelete'], cal100: 143, prot100: 12.6, baseGrams: 50, qual: 95 },
+            { keywords: ['pao', 'pão integral', 'fatia de pao'], cal100: 240, prot100: 9, baseGrams: 25, qual: 80 },
+            { keywords: ['frango', 'peito de frango', 'grelhado'], cal100: 165, prot100: 31, baseGrams: 100, qual: 95 },
+            { keywords: ['arroz', 'arroz branco', 'arroz integral'], cal100: 130, prot100: 2.7, baseGrams: 100, qual: 85 },
+            { keywords: ['feijao', 'feijão'], cal100: 76, prot100: 4.8, baseGrams: 100, qual: 90 },
+            { keywords: ['carne', 'patinho', 'bife'], cal100: 180, prot100: 26, baseGrams: 100, qual: 90 },
+            { keywords: ['whey', 'whey protein', 'scoop'], cal100: 400, prot100: 80, baseGrams: 30, qual: 95 },
+            { keywords: ['banana'], cal100: 89, prot100: 1.1, baseGrams: 90, qual: 90 },
+            { keywords: ['aveia'], cal100: 389, prot100: 16.9, baseGrams: 20, qual: 95 },
+            { keywords: ['batata doce'], cal100: 86, prot100: 1.6, baseGrams: 100, qual: 90 }
+        ];
+
+        // Global State Variables
+        window.appState = {
+            selectedDate: new Date().toISOString().split('T')[0],
+            dailyLogs: { calories: 0, protein: 0, water: 0, meals: [] },
+            weeklyMeasurements: [
+                { id: '1', date: '01/09', weight: 62.5, waist: 82.0, hip: 96.0 },
+                { id: '2', date: '08/09', weight: 62.2, waist: 80.5, hip: 95.8 },
+                { id: '3', date: '15/09', weight: 62.0, waist: 79.0, hip: 95.5 }
+            ],
+            user: null,
+            firestore: null,
+            appId: typeof __app_id !== 'undefined' ? __app_id : 'fit-recomp-user-app'
+        };
+
+        let chartInstance = null;
+        let unsubscribeDailyDoc = null;
+
+        // Initialize Firebase Connection
+        async function initFirebase() {
+            updateSyncStatus('connecting', 'Conectando...');
+            let firebaseConfig = defaultConfig;
+
+            const savedCfg = localStorage.getItem('user_firebase_cfg');
+            if (savedCfg) {
+                try { firebaseConfig = JSON.parse(savedCfg); } catch(e){}
+            } else if (typeof __firebase_config !== 'undefined') {
+                try { firebaseConfig = JSON.parse(__firebase_config); } catch(e){}
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const db = getFirestore(app);
+                window.appState.firestore = db;
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        window.appState.user = user;
+                        updateSyncStatus('online', 'Nuvem Conectada');
+                        listenToSelectedDateLogs();
+                        listenToMeasurements();
+                    } else {
+                        updateSyncStatus('offline', 'Modo Offline (Local)');
+                    }
+                });
+
+            } catch (err) {
+                console.warn('Firebase error, using local fallback:', err);
+                updateSyncStatus('offline', 'Modo Offline (Local)');
+                loadFromLocalStorage();
+            }
+        }
+
+        // Firestore Paths (Following Mandated Rules)
+        function getDailyDocRef(dateStr) {
+            const userId = window.appState.user ? window.appState.user.uid : 'local-user';
+            const appId = window.appState.appId;
+            return doc(window.appState.firestore, 'artifacts', appId, 'users', userId, 'daily_logs', dateStr);
+        }
+
+        function getMeasurementsCollRef() {
+            const userId = window.appState.user ? window.appState.user.uid : 'local-user';
+            const appId = window.appState.appId;
+            return collection(window.appState.firestore, 'artifacts', appId, 'users', userId, 'body_metrics');
+        }
+
+        // Realtime Listener for Daily Log
+        function listenToSelectedDateLogs() {
+            if (!window.appState.user || !window.appState.firestore) return;
+
+            if (unsubscribeDailyDoc) unsubscribeDailyDoc();
+
+            const dateStr = window.appState.selectedDate;
+            const docRef = getDailyDocRef(dateStr);
+
+            unsubscribeDailyDoc = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    window.appState.dailyLogs = docSnap.data();
+                } else {
+                    window.appState.dailyLogs = { calories: 0, protein: 0, water: 0, meals: [] };
+                }
+                renderUI();
+            }, (error) => {
+                console.error("Firestore listen error:", error);
+                updateSyncStatus('offline', 'Erro de Sincronização');
+            });
+        }
+
+        // Realtime Listener for Measurements
+        function listenToMeasurements() {
+            if (!window.appState.user || !window.appState.firestore) return;
+
+            const collRef = getMeasurementsCollRef();
+            onSnapshot(collRef, (snapshot) => {
+                const list = [];
+                snapshot.forEach((doc) => {
+                    list.push({ id: doc.id, ...doc.data() });
+                });
+                if (list.length > 0) {
+                    window.appState.weeklyMeasurements = list;
+                }
+                renderMeasurementsUI();
+            }, (err) => console.error(err));
+        }
+
+        // Save Current Daily Log to Firestore
+        async function saveDailyLogsToCloud() {
+            renderUI();
+            if (window.appState.user && window.appState.firestore) {
+                try {
+                    const docRef = getDailyDocRef(window.appState.selectedDate);
+                    await setDoc(docRef, window.appState.dailyLogs);
+                } catch (e) {
+                    console.error("Cloud Save Failed:", e);
+                }
+            } else {
+                localStorage.setItem('fit_recomp_local_' + window.appState.selectedDate, JSON.stringify(window.appState.dailyLogs));
+            }
+        }
+
+        function updateSyncStatus(state, text) {
+            const dot = document.getElementById('sync-dot');
+            const txt = document.getElementById('sync-status-text');
+
+            if (state === 'online') {
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+                txt.innerText = text;
+            } else if (state === 'offline') {
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+                txt.innerText = text;
+            } else {
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping';
+                txt.innerText = text;
+            }
+        }
+
+        // Smart Nutrition Text Parser
+        window.parseNutrition = function(text) {
+            if (!text) return { calories: 0, protein: 0, quality: 80 };
+
+            const norm = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            let totalCal = 0, totalProt = 0, totalQualSum = 0, matches = 0;
+
+            const segments = norm.split(/\+|\s+e\s+|\s+com\s+|,|;/);
+
+            segments.forEach(seg => {
+                FOOD_DB.forEach(item => {
+                    const matched = item.keywords.some(kw => seg.includes(kw));
+                    if (matched) {
+                        const numMatch = seg.match(/(\d+[\.,]?\d*)/);
+                        let qty = numMatch ? parseFloat(numMatch[1].replace(',', '.')) : 1;
+                        let grams = seg.includes('g') || seg.includes('gr') ? qty : item.baseGrams * qty;
+
+                        totalCal += Math.round((item.cal100 * grams) / 100);
+                        totalProt += Math.round((item.prot100 * grams) / 100);
+                        totalQualSum += item.qual;
+                        matches++;
+                    }
+                });
+            });
+
+            if (matches === 0) {
+                totalCal = 220; totalProt = 12; totalQualSum = 75; matches = 1;
+            }
+
+            return { calories: totalCal, protein: totalProt, quality: Math.round(totalQualSum / matches) };
+        };
+
+        window.previewFoodStats = function() {
+            const val = document.getElementById('food-input').value;
+            const res = window.parseNutrition(val);
+            document.getElementById('prev-cal').innerText = res.calories;
+            document.getElementById('prev-prot').innerText = res.protein;
+            document.getElementById('prev-qual').innerText = res.quality;
+        };
+
+        window.setQuickInput = function(text) {
+            document.getElementById('food-input').value = text;
+            window.previewFoodStats();
+        };
+
+        window.handleFoodSubmit = async function(e) {
+            e.preventDefault();
+            const input = document.getElementById('food-input');
+            const parsed = window.parseNutrition(input.value);
+
+            const meal = {
+                id: Date.now().toString(),
+                name: input.value.trim(),
+                calories: parsed.calories,
+                protein: parsed.protein,
+                quality: parsed.quality,
+                time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            };
+
+            window.appState.dailyLogs.meals.unshift(meal);
+            recalcTotals();
+            await saveDailyLogsToCloud();
+
+            input.value = '';
+            window.previewFoodStats();
+        };
+
+        window.removeMeal = async function(id) {
+            window.appState.dailyLogs.meals = window.appState.dailyLogs.meals.filter(m => m.id !== id);
+            recalcTotals();
+            await saveDailyLogsToCloud();
+        };
+
+        window.addWater = async function(ml) {
+            window.appState.dailyLogs.water = (window.appState.dailyLogs.water || 0) + ml;
+            await saveDailyLogsToCloud();
+        };
+
+        function recalcTotals() {
+            const meals = window.appState.dailyLogs.meals || [];
+            window.appState.dailyLogs.calories = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+            window.appState.dailyLogs.protein = meals.reduce((sum, m) => sum + (m.protein || 0), 0);
+        }
+
+        window.handleMeasurementSubmit = async function(e) {
+            e.preventDefault();
+            const weight = parseFloat(document.getElementById('m-weight').value);
+            const waist = parseFloat(document.getElementById('m-waist').value);
+            const hip = parseFloat(document.getElementById('m-hip').value) || null;
+            const thigh = parseFloat(document.getElementById('m-thigh').value) || null;
+
+            const dateLabel = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+            const entry = {
+                date: dateLabel,
+                weight, waist, hip, thigh
+            };
+
+            if (window.appState.user && window.appState.firestore) {
+                const collRef = getMeasurementsCollRef();
+                await setDoc(doc(collRef), entry);
+            } else {
+                entry.id = Date.now().toString();
+                window.appState.weeklyMeasurements.push(entry);
+                renderMeasurementsUI();
+            }
+
+            document.getElementById('m-waist').value = '';
+            document.getElementById('m-hip').value = '';
+            document.getElementById('m-thigh').value = '';
+        };
+
+        window.removeMeasurement = async function(id) {
+            if (window.appState.user && window.appState.firestore) {
+                const userId = window.appState.user.uid;
+                const appId = window.appState.appId;
+                await deleteDoc(doc(window.appState.firestore, 'artifacts', appId, 'users', userId, 'body_metrics', id));
+            } else {
+                window.appState.weeklyMeasurements = window.appState.weeklyMeasurements.filter(m => m.id !== id);
+                renderMeasurementsUI();
+            }
+        };
+
+        // UI Renderers
+        function renderUI() {
+            const logs = window.appState.dailyLogs || { calories: 0, protein: 0, water: 0, meals: [] };
+            
+            // Cards Updates
+            const cal = logs.calories || 0;
+            const calPct = Math.min(100, Math.round((cal / TARGET_CALORIES) * 100));
+            document.getElementById('card-calories-val').innerText = cal;
+            document.getElementById('bar-calories').style.width = `${calPct}%`;
+            document.getElementById('card-calories-rest').innerText = `${TARGET_CALORIES - cal} kcal`;
+
+            const prot = logs.protein || 0;
+            const protPct = Math.min(100, Math.round((prot / TARGET_PROTEIN) * 100));
+            document.getElementById('card-protein-val').innerText = prot;
+            document.getElementById('bar-protein').style.width = `${protPct}%`;
+            document.getElementById('card-protein-rest').innerText = `${Math.max(0, TARGET_PROTEIN - prot)}g`;
+
+            const water = logs.water || 0;
+            const waterPct = Math.min(100, Math.round((water / TARGET_WATER) * 100));
+            document.getElementById('card-water-val').innerText = water;
+            document.getElementById('bar-water').style.width = `${waterPct}%`;
+
+            const meals = logs.meals || [];
+            let avgQual = '--';
+            if (meals.length > 0) {
+                avgQual = Math.round(meals.reduce((s, m) => s + m.quality, 0) / meals.length);
+                document.getElementById('bar-quality').style.width = `${avgQual}%`;
+            } else {
+                document.getElementById('bar-quality').style.width = '0%';
+            }
+            document.getElementById('card-quality-val').innerText = avgQual;
+
+            renderMealList(meals);
+            renderAlerts(cal, protPct, waterPct);
+        }
+
+        function renderMealList(meals) {
+            const container = document.getElementById('meals-container');
+            document.getElementById('meal-count-badge').innerText = `${meals.length} item(ns)`;
+
+            if (meals.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-6 text-slate-500 text-xs italic bg-slate-900/40 rounded-xl border border-dashed border-slate-800">
+                        Nenhum registro para esta data.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = meals.map(m => `
+                <div class="flex items-center justify-between p-3 bg-slate-900/80 rounded-xl border border-slate-700/60 transition hover:border-slate-600">
+                    <div>
+                        <div class="font-semibold text-xs sm:text-sm text-slate-100">${m.name}</div>
+                        <div class="flex items-center gap-3 mt-1 text-[11px]">
+                            <span class="text-orange-400 font-semibold">${m.calories} kcal</span>
+                            <span class="text-amber-400 font-medium">+${m.protein}g proteína</span>
+                            <span class="text-slate-500">${m.time}</span>
+                        </div>
+                    </div>
+                    <button onclick="removeMeal('${m.id}')" class="text-slate-500 hover:text-rose-400 p-2 transition">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function renderAlerts(cal, protPct, waterPct) {
+            const container = document.getElementById('dynamic-alert-banner');
+            let alerts = [];
+
+            if (cal > TARGET_CALORIES * 1.1) {
+                alerts.push({
+                    bg: 'bg-rose-500/10 border-rose-500/30 text-rose-300',
+                    icon: 'fa-triangle-exclamation text-rose-400',
+                    title: 'Calorias Acima da Meta de Recomposição',
+                    desc: `Consumido: ${cal} kcal (Meta: ${TARGET_CALORIES} kcal). Para perder a barriga, foque em cortes leves de gorduras nas próximas refeições.`
+                });
+            }
+
+            if (protPct < 60 && new Date().getHours() >= 16) {
+                alerts.push({
+                    bg: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
+                    icon: 'fa-drumstick-bite text-amber-400',
+                    title: 'Proteína Baixa no Final do Dia',
+                    desc: `Atingiu apenas ${protPct}% da meta de proteína. Adicione ovos, peito de frango ou whey para garantir a preservação da sua massa magra.`
+                });
+            }
+
+            if (alerts.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const alert = alerts[0];
+            container.innerHTML = `
+                <div class="p-3.5 border rounded-2xl ${alert.bg} flex items-start gap-3 text-xs shadow-md">
+                    <i class="fa-solid ${alert.icon} text-base mt-0.5"></i>
+                    <div>
+                        <strong class="font-bold block text-sm">${alert.title}</strong>
+                        <p class="mt-0.5 opacity-90">${alert.desc}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMeasurementsUI() {
+            const list = [...window.appState.weeklyMeasurements];
+            const tbody = document.getElementById('meas-table-body');
+
+            tbody.innerHTML = list.map(m => `
+                <tr class="hover:bg-slate-700/20 transition">
+                    <td class="p-2 font-mono text-slate-300">${m.date}</td>
+                    <td class="p-2 font-bold text-white">${m.weight} kg</td>
+                    <td class="p-2 font-bold text-sky-400">${m.waist} cm</td>
+                    <td class="p-2 text-slate-400">${m.hip ? m.hip + ' cm' : '-'}</td>
+                    <td class="p-2">
+                        <button onclick="removeMeasurement('${m.id}')" class="text-slate-500 hover:text-rose-400">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            updateEvolutionChart(list);
+        }
+
+        function updateEvolutionChart(data) {
+            const ctx = document.getElementById('evolutionChart').getContext('2d');
+            const labels = data.map(d => d.date);
+            const waist = data.map(d => d.waist);
+            const weight = data.map(d => d.weight);
+
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Cintura (cm)',
+                            data: waist,
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'yWaist'
+                        },
+                        {
+                            label: 'Peso (kg)',
+                            data: weight,
+                            borderColor: '#22c55e',
+                            borderDash: [3, 3],
+                            tension: 0.3,
+                            yAxisID: 'yWeight'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                        yWaist: { position: 'left', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#38bdf8' } },
+                        yWeight: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#22c55e' } }
+                    },
+                    plugins: { legend: { labels: { color: '#94a3b8' } } }
+                }
+            });
+        }
+
+        // Date Picker Controls
+        window.changeDate = function(offset) {
+            const curr = new Date(window.appState.selectedDate + 'T00:00:00');
+            curr.setDate(curr.getDate() + offset);
+            window.appState.selectedDate = curr.toISOString().split('T')[0];
+            syncDatePickerUI();
+            listenToSelectedDateLogs();
+        };
+
+        window.onDatePickerChange = function(val) {
+            if (val) {
+                window.appState.selectedDate = val;
+                syncDatePickerUI();
+                listenToSelectedDateLogs();
+            }
+        };
+
+        window.selectToday = function() {
+            window.appState.selectedDate = new Date().toISOString().split('T')[0];
+            syncDatePickerUI();
+            listenToSelectedDateLogs();
+        };
+
+        function syncDatePickerUI() {
+            const dateInput = document.getElementById('active-date-picker');
+            dateInput.value = window.appState.selectedDate;
+
+            const today = new Date().toISOString().split('T')[0];
+            const isToday = window.appState.selectedDate === today;
+            document.getElementById('active-date-label').innerText = isToday ? 'Hoje' : window.appState.selectedDate;
+        }
+
+        // Navigation Tabs
+        window.switchTab = function(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => {
+                btn.className = 'flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-slate-400 hover:text-white transition flex items-center justify-center gap-2';
+            });
+
+            const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+            activeBtn.className = 'flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow';
+        };
+
+        // Firebase Modal Management
+        window.openCloudModal = function() {
+            document.getElementById('cloud-modal').classList.remove('hidden');
+        };
+
+        window.closeCloudModal = function() {
+            document.getElementById('cloud-modal').classList.add('hidden');
+        };
+
+        window.saveFirebaseCredentials = function(e) {
+            e.preventDefault();
+            const cfg = {
+                apiKey: document.getElementById('cfg-apiKey').value,
+                authDomain: document.getElementById('cfg-authDomain').value,
+                projectId: document.getElementById('cfg-projectId').value,
+                appId: document.getElementById('cfg-appId').value,
+            };
+            localStorage.setItem('user_firebase_cfg', JSON.stringify(cfg));
+            location.reload();
+        };
+
+        window.resetToDefaultFirebase = function() {
+            localStorage.removeItem('user_firebase_cfg');
+            location.reload();
+        };
+
+        // Startup Initialization
+        window.addEventListener('DOMContentLoaded', () => {
+            syncDatePickerUI();
+            initFirebase();
+            renderMeasurementsUI();
+        });
+    </script>
+</body>
+</html>
