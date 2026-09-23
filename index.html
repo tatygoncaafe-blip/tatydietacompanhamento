@@ -94,7 +94,7 @@
     <!-- Main Container -->
     <main class="max-w-6xl mx-auto px-4 mt-6 space-y-6">
 
-        <!-- Focus Warning Alert Banner (Shown when off-target) -->
+        <!-- Focus Warning Alert Banner -->
         <div id="focus-alert-banner" class="hidden rounded-2xl p-4 border transition-all duration-300">
             <div class="flex items-start gap-3">
                 <div id="focus-alert-icon-bg" class="p-2 rounded-xl">
@@ -234,7 +234,7 @@
 
                     <!-- Quick Preset Shortcuts -->
                     <div class="flex flex-wrap gap-2 text-xs">
-                        <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="Cuscuz com queijo minas">🌽 Cuscuz + Queijo</button>
+                        <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="Cuscuz com queijo minas e 1 ovo">🌽 Cuscuz + Queijo + Ovo</button>
                         <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="150g Peito de Frango Grelhado">🍗 Frango 150g</button>
                         <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="Café sem açúcar">☕ Café sem Açúcar</button>
                         <button type="button" class="preset-btn bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg transition" data-text="Maçã">🍎 Maçã</button>
@@ -410,16 +410,21 @@
 
         // APP STATE
         const TARGETS = { calories: 1600, protein: 124, water: 2800, quality: 80 };
-        let currentDateStr = new Date().toISOString().split('T')[0];
+        
+        function getFormattedDate(d = new Date()) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        let currentDateStr = getFormattedDate();
         let db = null;
-        let userId = localStorage.getItem('fit_userId') || 'tati62kg';
+        let unsubscribeSnapshot = null;
+        let userId = (localStorage.getItem('fit_userId') || 'tati62kg').trim().toLowerCase();
         let bodyChart = null;
 
-        let dailyData = {
-            foods: [],
-            water: 0
-        };
-
+        let dailyData = { foods: [], water: 0 };
         let bodyHistory = [];
 
         // DOM ELEMENTS
@@ -428,10 +433,8 @@
         const nextDateBtn = document.getElementById('next-date-btn');
         const todayBtn = document.getElementById('today-btn');
 
-        // Initialize Lucide Icons
         lucide.createIcons();
 
-        // DATE CONTROLS
         selectedDateEl.value = currentDateStr;
 
         function setDate(dateStr) {
@@ -440,76 +443,171 @@
             loadDataForCurrentDate();
         }
 
-        selectedDateEl.addEventListener('change', (e) => setDate(e.target.value));
+        selectedDateEl.addEventListener('change', (e) => {
+            if (e.target.value) setDate(e.target.value);
+        });
         
         prevDateBtn.addEventListener('click', () => {
-            const d = new Date(currentDateStr);
+            const parts = currentDateStr.split('-');
+            const d = new Date(parts[0], parts[1] - 1, parts[2]);
             d.setDate(d.getDate() - 1);
-            setDate(d.toISOString().split('T')[0]);
+            setDate(getFormattedDate(d));
         });
 
         nextDateBtn.addEventListener('click', () => {
-            const d = new Date(currentDateStr);
+            const parts = currentDateStr.split('-');
+            const d = new Date(parts[0], parts[1] - 1, parts[2]);
             d.setDate(d.getDate() + 1);
-            setDate(d.toISOString().split('T')[0]);
+            setDate(getFormattedDate(d));
         });
 
         todayBtn.addEventListener('click', () => {
-            setDate(new Date().toISOString().split('T')[0]);
+            setDate(getFormattedDate());
         });
 
-        // NOVO PARSER EXPANDIDO DE ALIMENTOS
+        // ALGORITMO COMPLETO DE ANÁLISE NUTRICIONAL (BASEADO NA LISTA CALORIAS.DOCX)
         function parseFoodInput(text) {
             const lower = text.toLowerCase();
             let cal = 0;
             let prot = 0;
             let qual = 85;
+            let itemsFound = 0;
 
-            // Bebidas
-            if (lower.includes('café') || lower.includes('cafe')) {
-                if (lower.includes('açúcar') || lower.includes('acucar')) { cal += 40; prot += 0; }
-                else { cal += 5; prot += 0; qual += 5; }
+            // --- BEBIDAS ---
+            if (lower.includes('café sem') || lower.includes('cafe sem')) { cal += 2; prot += 0; qual += 5; itemsFound++; }
+            else if (lower.includes('café com leite') || lower.includes('cafe com leite')) { cal += 100; prot += 5; itemsFound++; }
+            else if (lower.includes('café com') || lower.includes('cafe com')) { cal += 45; prot += 0; itemsFound++; }
+            else if (lower.includes('café') || lower.includes('cafe')) { cal += 2; prot += 0; qual += 5; itemsFound++; }
+
+            if (lower.includes('suco de laranja')) { cal += 90; prot += 1.5; qual += 5; itemsFound++; }
+            if (lower.includes('suco de uva')) { cal += 120; prot += 0; qual += 5; itemsFound++; }
+            if (lower.includes('água de coco') || lower.includes('agua de coco')) { cal += 40; prot += 0.5; qual += 10; itemsFound++; }
+            if (lower.includes('refrigerante zero') || lower.includes('refri zero')) { cal += 0; prot += 0; qual -= 10; itemsFound++; }
+            else if (lower.includes('refrigerante') || lower.includes('refri')) { cal += 145; prot += 0; qual -= 20; itemsFound++; }
+
+            // --- FRUTAS ---
+            if (lower.includes('maçã') || lower.includes('maca')) { cal += 70; prot += 0.4; qual += 10; itemsFound++; }
+            if (lower.includes('banana prata')) { cal += 80; prot += 1.0; qual += 5; itemsFound++; }
+            else if (lower.includes('banana nanica')) { cal += 90; prot += 1.1; qual += 5; itemsFound++; }
+            else if (lower.includes('banana')) { cal += 85; prot += 1.0; qual += 5; itemsFound++; }
+            if (lower.includes('mamão papaia') || lower.includes('mamao papaia')) { cal += 60; prot += 0.7; qual += 10; itemsFound++; }
+            else if (lower.includes('mamão') || lower.includes('mamao')) { cal += 50; prot += 0.5; qual += 10; itemsFound++; }
+            if (lower.includes('abacate')) { cal += 96; prot += 1.2; qual += 10; itemsFound++; }
+            if (lower.includes('abacaxi')) { cal += 48; prot += 0.5; qual += 10; itemsFound++; }
+            if (lower.includes('laranja')) { cal += 60; prot += 1.1; qual += 10; itemsFound++; }
+            if (lower.includes('manga')) { cal += 60; prot += 0.8; qual += 5; itemsFound++; }
+            if (lower.includes('melancia')) { cal += 30; prot += 0.6; qual += 10; itemsFound++; }
+            if (lower.includes('melão') || lower.includes('melao')) { cal += 34; prot += 0.8; qual += 10; itemsFound++; }
+            if (lower.includes('morango')) { cal += 32; prot += 0.7; qual += 10; itemsFound++; }
+            if (lower.includes('uva-passa') || lower.includes('passa')) { cal += 150; prot += 1.5; qual += 5; itemsFound++; }
+            else if (lower.includes('uva')) { cal += 69; prot += 0.7; qual += 5; itemsFound++; }
+            if (lower.includes('goiaba')) { cal += 68; prot += 2.6; qual += 10; itemsFound++; }
+            if (lower.includes('kiwi')) { cal += 61; prot += 1.1; qual += 10; itemsFound++; }
+            if (lower.includes('maracujá') || lower.includes('maracuja')) { cal += 68; prot += 2.2; qual += 10; itemsFound++; }
+            if (lower.includes('pera')) { cal += 57; prot += 0.4; qual += 10; itemsFound++; }
+            if (lower.includes('pêssego') || lower.includes('pessego')) { cal += 39; prot += 0.9; qual += 10; itemsFound++; }
+            if (lower.includes('tangerina') || lower.includes('mexerica')) { cal += 53; prot += 0.8; qual += 10; itemsFound++; }
+            if (lower.includes('açaí') || lower.includes('acai')) { cal += 130; prot += 2; qual += 5; itemsFound++; }
+
+            // --- CARBOIDRATOS / CAFÉ DA MANHÃ ---
+            if (lower.includes('cuscuz')) { cal += 110; prot += 2.2; qual += 5; itemsFound++; }
+            if (lower.includes('tapioca')) { cal += 115; prot += 0.2; itemsFound++; }
+            if (lower.includes('pão francês') || lower.includes('pao frances') || lower.includes('pão de sal')) { cal += 135; prot += 4.5; itemsFound++; }
+            else if (lower.includes('pão integral') || lower.includes('pao integral')) { cal += 120; prot += 5.0; qual += 5; itemsFound++; }
+            else if (lower.includes('pão') || lower.includes('pao')) { cal += 130; prot += 4.0; itemsFound++; }
+            if (lower.includes('arroz integral')) { cal += 124; prot += 2.6; qual += 5; itemsFound++; }
+            else if (lower.includes('arroz')) { cal += 130; prot += 2.5; itemsFound++; }
+            if (lower.includes('batata doce')) { cal += 90; prot += 2.0; qual += 10; itemsFound++; }
+            else if (lower.includes('batata')) { cal += 87; prot += 1.9; qual += 5; itemsFound++; }
+            if (lower.includes('mandioca') || lower.includes('aipim')) { cal += 125; prot += 0.6; qual += 5; itemsFound++; }
+            if (lower.includes('aveia')) { cal += 117; prot += 5.0; qual += 10; itemsFound++; }
+            if (lower.includes('granola')) { cal += 130; prot += 3.0; itemsFound++; }
+            if (lower.includes('macarrão') || lower.includes('macarrao')) { cal += 155; prot += 5.0; itemsFound++; }
+
+            // --- PROTEÍNAS (CARNES, OVOS, LEITE, LATICÍNIOS) ---
+            if (lower.includes('peito de frango') || lower.includes('frango grelhado')) { cal += 165; prot += 31.0; qual += 10; itemsFound++; }
+            else if (lower.includes('coxa de frango')) { cal += 180; prot += 26.0; qual += 5; itemsFound++; }
+            else if (lower.includes('sobrecoxa')) { cal += 190; prot += 25.0; qual += 5; itemsFound++; }
+            else if (lower.includes('frango')) { cal += 170; prot += 28.0; qual += 10; itemsFound++; }
+
+            if (lower.includes('patinho moído') || lower.includes('patinho moido') || lower.includes('patinho')) { cal += 190; prot += 30.0; qual += 10; itemsFound++; }
+            else if (lower.includes('carne moída') || lower.includes('carne moida')) { cal += 200; prot += 27.0; qual += 5; itemsFound++; }
+            else if (lower.includes('alcatra')) { cal += 220; prot += 29.0; qual += 5; itemsFound++; }
+            else if (lower.includes('filé mignon') || lower.includes('file mignon')) { cal += 220; prot += 29.0; qual += 10; itemsFound++; }
+            else if (lower.includes('contrafilé') || lower.includes('contrafile')) { cal += 250; prot += 27.0; itemsFound++; }
+            else if (lower.includes('carne seca')) { cal += 250; prot += 36.0; itemsFound++; }
+            else if (lower.includes('carne')) { cal += 200; prot += 28.0; qual += 5; itemsFound++; }
+
+            if (lower.includes('ovo') || lower.includes('ovos')) {
+                let qtdOvos = 1;
+                if (lower.includes('3 ovos') || lower.includes('3 ovo')) qtdOvos = 3;
+                else if (lower.includes('2 ovos') || lower.includes('2 ovo')) qtdOvos = 2;
+                else if (lower.includes('4 ovos') || lower.includes('4 ovo')) qtdOvos = 4;
+                
+                cal += 70 * qtdOvos;
+                prot += 6.0 * qtdOvos;
+                qual += 5;
+                itemsFound++;
             }
 
-            // Frutas & Lanches
-            if (lower.includes('maçã') || lower.includes('maca')) { cal += 70; prot += 0; qual += 10; }
-            if (lower.includes('banana')) { cal += 90; prot += 1; qual += 5; }
-            if (lower.includes('mamão') || lower.includes('mamao')) { cal += 50; prot += 1; qual += 10; }
+            if (lower.includes('clara')) { cal += 17; prot += 3.6; qual += 5; itemsFound++; }
 
-            // Cuscuz & Carboidratos
-            if (lower.includes('cuscuz')) { cal += 150; prot += 3; qual += 5; }
-            if (lower.includes('tapioca')) { cal += 140; prot += 1; }
-            if (lower.includes('pão') || lower.includes('pao')) { cal += 130; prot += 4; }
-            if (lower.includes('arroz')) { cal += 130; prot += 3; }
-            if (lower.includes('batata')) { cal += 110; prot += 2; qual += 5; }
-            if (lower.includes('aveia')) { cal += 100; prot += 4; qual += 10; }
+            if (lower.includes('whey') || lower.includes('shake de proteína')) { cal += 120; prot += 24.0; qual += 10; itemsFound++; }
 
-            // Laticínios / Queijos
-            if (lower.includes('queijo minas') || lower.includes('queijo branco')) { cal += 80; prot += 6; qual += 5; }
-            else if (lower.includes('queijo')) { cal += 110; prot += 7; }
-            if (lower.includes('iogurte')) { cal += 90; prot += 7; qual += 5; }
+            if (lower.includes('queijo minas frescal') || lower.includes('queijo minas') || lower.includes('queijo branco')) { cal += 80; prot += 6.0; qual += 5; itemsFound++; }
+            else if (lower.includes('muçarela') || lower.includes('mussarela')) { cal += 100; prot += 7.0; itemsFound++; }
+            else if (lower.includes('ricota')) { cal += 70; prot += 6.0; qual += 5; itemsFound++; }
+            else if (lower.includes('cottage')) { cal += 90; prot += 11.5; qual += 10; itemsFound++; }
+            else if (lower.includes('parmesão') || lower.includes('parmesao')) { cal += 110; prot += 9.5; itemsFound++; }
+            else if (lower.includes('queijo')) { cal += 90; prot += 6.0; itemsFound++; }
 
-            // Proteínas Principais
-            if (lower.includes('frango')) { cal += 220; prot += 31; qual += 10; }
-            if (lower.includes('ovo')) { cal += 150; prot += 13; qual += 5; }
-            if (lower.includes('whey') || lower.includes('shake')) { cal += 120; prot += 24; qual += 5; }
-            if (lower.includes('carne') || lower.includes('patinho')) { cal += 240; prot += 28; qual += 5; }
-            if (lower.includes('peixe') || lower.includes('tilápia') || lower.includes('tilapia')) { cal += 180; prot += 26; qual += 10; }
+            if (lower.includes('leite desnatado')) { cal += 70; prot += 6.5; qual += 5; itemsFound++; }
+            else if (lower.includes('leite semidesnatado')) { cal += 90; prot += 6.0; qual += 5; itemsFound++; }
+            else if (lower.includes('leite integral')) { cal += 120; prot += 6.0; itemsFound++; }
+            else if (lower.includes('leite')) { cal += 90; prot += 6.0; itemsFound++; }
 
-            // Verduras / Acompanhamentos
-            if (lower.includes('salada') || lower.includes('legumes')) { cal += 30; prot += 1; qual += 15; }
+            if (lower.includes('iogurte grego')) { cal += 110; prot += 8.0; qual += 5; itemsFound++; }
+            else if (lower.includes('iogurte natural') || lower.includes('iogurte')) { cal += 100; prot += 6.0; qual += 5; itemsFound++; }
 
-            // Se nenhum alimento conhecido foi detectado
-            if (cal === 0 && prot === 0) {
+            if (lower.includes('tilápia') || lower.includes('tilapia') || lower.includes('peixe')) { cal += 180; prot += 26.0; qual += 10; itemsFound++; }
+
+            // --- LEGUMINOSAS ---
+            if (lower.includes('feijão preto') || lower.includes('feijao preto')) { cal += 77; prot += 4.5; qual += 10; itemsFound++; }
+            else if (lower.includes('feijão') || lower.includes('feijao')) { cal += 76; prot += 4.8; qual += 10; itemsFound++; }
+            if (lower.includes('lentilha')) { cal += 116; prot += 9.0; qual += 10; itemsFound++; }
+            if (lower.includes('grão-de-bico') || lower.includes('grao de bico')) { cal += 164; prot += 8.9; qual += 10; itemsFound++; }
+
+            // --- SALADAS / VERDURAS ---
+            if (lower.includes('salada') || lower.includes('alface') || lower.includes('rúcula') || lower.includes('couve') || lower.includes('brócolis') || lower.includes('brocolis')) { cal += 25; prot += 1.5; qual += 15; itemsFound++; }
+
+            // --- PRATOS PRONTOS & FAST FOOD ---
+            if (lower.includes('pizza')) { cal += 280; prot += 12.0; qual -= 15; itemsFound++; }
+            if (lower.includes('hambúrguer') || lower.includes('hamburguer') || lower.includes('x-salada')) { cal += 450; prot += 20.0; qual -= 15; itemsFound++; }
+            if (lower.includes('pão de queijo') || lower.includes('pao de queijo')) { cal += 90; prot += 2.0; itemsFound++; }
+            if (lower.includes('coxinha')) { cal += 300; prot += 8.0; qual -= 15; itemsFound++; }
+            if (lower.includes('pastel')) { cal += 350; prot += 11.0; qual -= 15; itemsFound++; }
+            if (lower.includes('escondidinho')) { cal += 180; prot += 9.0; itemsFound++; }
+            if (lower.includes('strogonoff')) { cal += 165; prot += 13.0; itemsFound++; }
+            if (lower.includes('baião de dois') || lower.includes('baiao de dois')) { cal += 175; prot += 7.0; itemsFound++; }
+
+            // --- DOCES & GORDURAS ---
+            if (lower.includes('chocolate 70%') || lower.includes('chocolate amargo')) { cal += 170; prot += 2.5; qual += 5; itemsFound++; }
+            else if (lower.includes('chocolate')) { cal += 160; prot += 2.0; qual -= 10; itemsFound++; }
+            if (lower.includes('brigadeiro')) { cal += 80; prot += 1.0; qual -= 10; itemsFound++; }
+            if (lower.includes('paçoca') || lower.includes('pacoca')) { cal += 100; prot += 3.0; itemsFound++; }
+            if (lower.includes('pasta de amendoim')) { cal += 120; prot += 5.0; qual += 5; itemsFound++; }
+            if (lower.includes('azeite')) { cal += 117; prot += 0.0; qual += 5; itemsFound++; }
+
+            // Se nenhum alimento da lista foi identificado
+            if (itemsFound === 0) {
                 cal = 120;
                 prot = 5;
             }
 
-            qual = Math.min(100, qual);
-            return { cal, prot, qual };
+            qual = Math.max(0, Math.min(100, qual));
+            return { cal: Math.round(cal), prot: Math.round(prot * 10) / 10, qual };
         }
 
-        // AUTO PREVIEW & INPUT EVENTS
         const foodInput = document.getElementById('food-input');
         const inputCal = document.getElementById('input-cal');
         const inputProt = document.getElementById('input-prot');
@@ -525,7 +623,6 @@
             }
         });
 
-        // PRESET BUTTONS
         document.querySelectorAll('.preset-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 foodInput.value = btn.getAttribute('data-text');
@@ -533,7 +630,6 @@
             });
         });
 
-        // WATER BUTTONS
         document.getElementById('add-water-250').addEventListener('click', () => addWater(250));
         document.getElementById('add-water-500').addEventListener('click', () => addWater(500));
 
@@ -543,14 +639,13 @@
             updateUI();
         }
 
-        // FOOD FORM SUBMIT
         document.getElementById('food-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const text = foodInput.value.trim();
             if (!text) return;
 
             const calVal = parseInt(inputCal.value) || 0;
-            const protVal = parseInt(inputProt.value) || 0;
+            const protVal = parseFloat(inputProt.value) || 0;
             const qualVal = parseInt(inputQual.value) || 85;
 
             const newItem = {
@@ -571,14 +666,12 @@
             updateUI();
         });
 
-        // DELETE FOOD
         window.deleteFood = function(id) {
             dailyData.foods = dailyData.foods.filter(f => f.id !== id);
             saveDailyData();
             updateUI();
         };
 
-        // BODY MEASUREMENTS FORM
         document.getElementById('body-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const weight = parseFloat(document.getElementById('input-weight').value);
@@ -601,22 +694,20 @@
             alert('Medidas salvas com sucesso!');
         });
 
-        // UPDATE UI DASHBOARD
         function updateUI() {
             const foods = dailyData.foods || [];
             const water = dailyData.water || 0;
 
             const totalCal = foods.reduce((acc, f) => acc + (f.calories || 0), 0);
-            const totalProt = foods.reduce((acc, f) => acc + (f.protein || 0), 0);
+            const totalProt = Math.round(foods.reduce((acc, f) => acc + (f.protein || 0), 0) * 10) / 10;
             const avgQual = foods.length > 0 ? Math.round(foods.reduce((acc, f) => acc + (f.quality || 80), 0) / foods.length) : '--';
 
-            // Cards
             document.getElementById('card-cal-current').textContent = totalCal;
             document.getElementById('card-cal-rem').textContent = `${Math.max(0, TARGETS.calories - totalCal)} kcal`;
             document.getElementById('card-cal-bar').style.width = `${Math.min(100, (totalCal / TARGETS.calories) * 100)}%`;
 
             document.getElementById('card-prot-current').textContent = totalProt;
-            document.getElementById('card-prot-rem').textContent = `${Math.max(0, TARGETS.protein - totalProt)}g`;
+            document.getElementById('card-prot-rem').textContent = `${Math.max(0, Math.round((TARGETS.protein - totalProt) * 10) / 10)}g`;
             document.getElementById('card-prot-bar').style.width = `${Math.min(100, (totalProt / TARGETS.protein) * 100)}%`;
 
             document.getElementById('card-water-current').textContent = water;
@@ -625,7 +716,6 @@
             document.getElementById('card-quality-score').textContent = avgQual;
             document.getElementById('card-quality-bar').style.width = typeof avgQual === 'number' ? `${avgQual}%` : '0%';
 
-            // Food List
             const foodListEl = document.getElementById('food-list');
             document.getElementById('log-count').textContent = `${foods.length} refeições`;
 
@@ -652,7 +742,6 @@
                 lucide.createIcons();
             }
 
-            // Focus Warning Alert
             updateFocusAlert(totalProt, water);
         }
 
@@ -683,7 +772,6 @@
             lucide.createIcons();
         }
 
-        // STORAGE LOGIC (LOCAL + FIREBASE)
         function loadDataForCurrentDate() {
             const localKey = `fit_data_${currentDateStr}`;
             const saved = localStorage.getItem(localKey);
@@ -691,7 +779,9 @@
             updateUI();
 
             if (db) {
-                onSnapshot(doc(db, "users", userId, "dailyLogs", currentDateStr), (docSnap) => {
+                if (unsubscribeSnapshot) unsubscribeSnapshot();
+                
+                unsubscribeSnapshot = onSnapshot(doc(db, "users", userId, "dailyLogs", currentDateStr), (docSnap) => {
                     if (docSnap.exists()) {
                         dailyData = docSnap.data();
                         localStorage.setItem(localKey, JSON.stringify(dailyData));
@@ -717,7 +807,6 @@
             }
         }
 
-        // CHART SETUP
         function initChart() {
             const ctx = document.getElementById('bodyChart').getContext('2d');
             bodyChart = new Chart(ctx, {
@@ -769,7 +858,6 @@
             bodyChart.update();
         }
 
-        // TABS NAVIGATION
         const tabDiet = document.getElementById('tab-btn-diet');
         const tabBody = document.getElementById('tab-btn-body');
         const tabTips = document.getElementById('tab-btn-tips');
@@ -794,14 +882,24 @@
         tabBody.addEventListener('click', () => switchTab(tabBody, contentBody));
         tabTips.addEventListener('click', () => switchTab(tabTips, contentTips));
 
-        // FIREBASE CONFIG & INITIALIZATION
         const modal = document.getElementById('config-modal');
-        document.getElementById('open-config-btn').addEventListener('click', () => modal.classList.remove('hidden'));
+        document.getElementById('open-config-btn').addEventListener('click', () => {
+            document.getElementById('cfg-userid').value = userId;
+            const configStr = localStorage.getItem('fit_firebase_cfg');
+            if (configStr) {
+                const cfg = JSON.parse(configStr);
+                document.getElementById('cfg-apikey').value = cfg.apiKey || '';
+                document.getElementById('cfg-authdomain').value = cfg.authDomain || '';
+                document.getElementById('cfg-projectid').value = cfg.projectId || '';
+                document.getElementById('cfg-appid').value = cfg.appId || '';
+            }
+            modal.classList.remove('hidden');
+        });
         document.getElementById('close-config-btn').addEventListener('click', () => modal.classList.add('hidden'));
 
         function initFirebase() {
             const configStr = localStorage.getItem('fit_firebase_cfg');
-            userId = localStorage.getItem('fit_userId') || 'tati62kg';
+            userId = (localStorage.getItem('fit_userId') || 'tati62kg').trim().toLowerCase();
 
             if (configStr) {
                 try {
@@ -828,14 +926,14 @@
                 projectId: document.getElementById('cfg-projectid').value.trim(),
                 appId: document.getElementById('cfg-appid').value.trim()
             };
-            userId = document.getElementById('cfg-userid').value.trim() || 'tati62kg';
+            userId = (document.getElementById('cfg-userid').value.trim() || 'tati62kg').toLowerCase();
 
             localStorage.setItem('fit_firebase_cfg', JSON.stringify(cfg));
             localStorage.setItem('fit_userId', userId);
 
             modal.classList.add('hidden');
             initFirebase();
-            alert('Configuração salva!');
+            alert(`Sincronizado no usuário: ${userId}`);
         });
 
         document.getElementById('reset-config-btn').addEventListener('click', () => {
@@ -843,7 +941,6 @@
             location.reload();
         });
 
-        // INIT APP
         initChart();
         initFirebase();
         loadDataForCurrentDate();
